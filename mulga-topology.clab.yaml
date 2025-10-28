@@ -1,0 +1,81 @@
+name: mulga-sim
+topology:
+  nodes:
+    # --- Zone 1: 4G/5G ---
+    zone1:
+      kind: linux
+      image: frrouting/frr:latest
+      mgmt_ipv4: 172.20.0.11
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+
+    # --- Zone 2: SDR to WAN ---
+    zone2:
+      kind: linux
+      image: frrouting/frr:latest
+      mgmt_ipv4: 172.20.0.12
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+
+    # --- Zone 3: Starlink LEO ---
+    zone3:
+      kind: linux
+      image: frrouting/frr:latest
+      mgmt_ipv4: 172.20.0.13
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+
+    # --- Route Reflector for iBGP (optional) ---
+    rr:
+      kind: linux
+      image: frrouting/frr:latest
+      mgmt_ipv4: 172.20.0.10
+      exec:
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+
+  links:
+    # Primary backhauls
+    - endpoints: ["zone1:eth1", "rr:eth1"]
+      # Simulate 4G/5G latency and loss
+      # ~40ms delay, 1% loss, 50 Mbps throughput
+      delay: 40ms
+      loss: 1%
+      bandwidth: 50mbit
+
+    - endpoints: ["zone2:eth1", "rr:eth2"]
+      # SDR radio link simulation
+      # ~80ms delay, 2% loss, 10 Mbps throughput
+      delay: 80ms
+      loss: 2%
+      bandwidth: 10mbit
+
+    - endpoints: ["zone3:eth1", "rr:eth3"]
+      # Starlink link simulation
+      # ~50ms delay, 0.5% loss, 100 Mbps throughput
+      delay: 50ms
+      loss: 0.5%
+      bandwidth: 100mbit
+
+    # LoRaWAN low-bandwidth control links (between all zones)
+    - endpoints: ["zone1:eth2", "zone2:eth2"]
+      delay: 200ms
+      loss: 5%
+      bandwidth: 50kbit
+
+    - endpoints: ["zone2:eth3", "zone3:eth2"]
+      delay: 200ms
+      loss: 5%
+      bandwidth: 50kbit
+
+    - endpoints: ["zone3:eth3", "zone1:eth3"]
+      delay: 200ms
+      loss: 5%
+      bandwidth: 50kbit
+
+  mgmt:
+    network: clab
+    ipv4_subnet: 172.20.0.0/24
